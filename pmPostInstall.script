@@ -1,6 +1,6 @@
 #!/bin/sh
 
-APPID=us.ryanhope.wterm
+APPID=org.wdtz.wterm
 
 APPS=/media/cryptofs/apps
 

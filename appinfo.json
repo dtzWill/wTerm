@@ -1,6 +1,6 @@
 {
-	"title": "wTerm",
-	"id": "us.ryanhope.wterm",
+	"title": "dtzTerm",
+	"id": "org.wdtz.wterm",
 	"version": "0.4.0",
 	"vendor": "Ryan Hope",
 	"type": "web",
@@ -15,7 +15,7 @@
 	"universalSearch": {
 		"action": {
 			"displayName": "Execute In Terminal",
-			"url": "us.ryanhope.wterm",
+			"url": "org.wdtz.wterm",
 			"launchParam": "command"
 		}
 	},
