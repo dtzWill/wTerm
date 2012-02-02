@@ -114,7 +114,6 @@ void TerminalState::eraseScreen()
 	pthread_mutex_lock(&m_rwLock);
 
 	// why not scrolling things into scrollback ?
-	// m_screenBuffer.fillLines(m_nTopMargin, m_nBottomMargin, TSCell(BLANK, m_currentGraphicsState));
 	m_screenBuffer.fillLines(1, m_displayScreenSize.getY(), TSCell(BLANK, m_currentGraphicsState));
 
 	pthread_mutex_unlock(&m_rwLock);
@@ -137,7 +136,7 @@ void TerminalState::deleteCharacters(int nChars)
 
 	Point displayLoc = getDisplayCursorLocation();
 
-	m_screenBuffer.deleteCharacters(displayLoc.getY(), displayLoc.getX(), nChars);
+	m_screenBuffer.deleteCharacters(displayLoc.getY(), displayLoc.getX(), nChars, TSCell(BLANK, m_currentGraphicsState));
 
 	pthread_mutex_unlock(&m_rwLock);
 }
@@ -151,7 +150,7 @@ void TerminalState::insertLines(int nLines)
 	// Insert lines into the scroll buffer region:
 
 	if (curLine >= m_nTopMargin) {
-		m_screenBuffer.scrollLines(curLine, m_nBottomMargin, -nLines);
+		m_screenBuffer.scrollLines(curLine, m_nBottomMargin, -nLines, TSCell(BLANK, m_currentGraphicsState));
 	}
 
 	pthread_mutex_unlock(&m_rwLock);
@@ -165,7 +164,7 @@ void TerminalState::deleteLines(int nLines)
 
 	// Delete lines from the scroll buffer region:
 	if (curLine >= m_nTopMargin) {
-		m_screenBuffer.scrollLines(curLine, m_nBottomMargin, nLines);
+		m_screenBuffer.scrollLines(curLine, m_nBottomMargin, nLines, TSCell(BLANK, m_currentGraphicsState));
 	}
 
 	pthread_mutex_unlock(&m_rwLock);
@@ -185,7 +184,7 @@ void TerminalState::moveCursorUp(int nPos, bool bScroll)
 		{
 			if (bScroll)
 			{
-				m_screenBuffer.scrollLines(m_nTopMargin, m_nBottomMargin, nY - m_nTopMargin);
+				m_screenBuffer.scrollLines(m_nTopMargin, m_nBottomMargin, nY - m_nTopMargin, TSCell(BLANK, m_currentGraphicsState));
 			}
 
 			nY = m_nTopMargin;
@@ -221,7 +220,7 @@ void TerminalState::moveCursorDown(int nPos, bool bScroll)
 		{
 			if (bScroll)
 			{
-				m_screenBuffer.scrollLines(m_nTopMargin, m_nBottomMargin, nY - m_nBottomMargin);
+				m_screenBuffer.scrollLines(m_nTopMargin, m_nBottomMargin, nY - m_nBottomMargin, TSCell(BLANK, m_currentGraphicsState));
 			}
 
 			nY = m_nBottomMargin;
@@ -284,7 +283,7 @@ void TerminalState::backIndex()
 
 	if (m_cursorLoc.getX() == 1) {
 		TSCell blank(BLANK, m_currentGraphicsState);
-		m_screenBuffer.deleteCharacters(m_cursorLoc.getY(), maxX, 1);
+		m_screenBuffer.deleteCharacters(m_cursorLoc.getY(), maxX, 1, blank);
 		m_screenBuffer.insertCharacter(m_cursorLoc.getY(), 1, maxX, blank);
 	} else {
 		moveCursorBackward(1);
@@ -301,7 +300,7 @@ void TerminalState::forwardIndex()
 
 	if (m_cursorLoc.getX() == maxX) {
 		TSCell blank(BLANK, m_currentGraphicsState);
-		m_screenBuffer.deleteCharacters(m_cursorLoc.getY(), 1, 1);
+		m_screenBuffer.deleteCharacters(m_cursorLoc.getY(), 1, 1, blank);
 		m_screenBuffer.insertCharacter(m_cursorLoc.getY(), maxX, maxX, blank);
 	} else {
 		moveCursorForward(1);
@@ -318,7 +317,7 @@ void TerminalState::insertColumns(int value)
 
 	TSCell blank(BLANK, m_currentGraphicsState);
 
-	for (int r=getDisplayScreenSize().getY(); r>0; r--) {
+	for (int r = m_nTopMargin; r <= m_nBottomMargin; ++r) {
 		for (int x=0; x<value; x++) {
 			m_screenBuffer.insertCharacter(r, m_cursorLoc.getX(), maxX, blank);
 		}
@@ -331,10 +330,39 @@ void TerminalState::deleteColumns(int value)
 {
 	pthread_mutex_lock(&m_rwLock);
 
-	// int maxX = (getTerminalModeFlags() & TS_TM_COLUMN) ? getDisplayScreenSize().getX() : 80;
+	TSCell blank(BLANK, m_currentGraphicsState);
+
+	for (int r = m_nTopMargin; r <= m_nBottomMargin; ++r)
+		m_screenBuffer.deleteCharacters(r, m_cursorLoc.getX(), value, blank);
+
+	pthread_mutex_unlock(&m_rwLock);
+}
+
+void TerminalState::scrollLeft(int value)
+{
+	pthread_mutex_lock(&m_rwLock);
+
+	TSCell blank(BLANK, m_currentGraphicsState);
 
 	for (int r=getDisplayScreenSize().getY(); r>0; r--)
-		m_screenBuffer.deleteCharacters(r, m_cursorLoc.getX(), value);
+		m_screenBuffer.deleteCharacters(r, 1, value, blank);
+
+	pthread_mutex_unlock(&m_rwLock);
+}
+
+void TerminalState::scrollRight(int value)
+{
+	pthread_mutex_lock(&m_rwLock);
+
+	int maxX = (getTerminalModeFlags() & TS_TM_COLUMN) ? getDisplayScreenSize().getX() : 80;
+
+	TSCell blank(BLANK, m_currentGraphicsState);
+
+	for (int r=getDisplayScreenSize().getY(); r>0; r--) {
+		for (int x=0; x<value; x++) {
+			m_screenBuffer.insertCharacter(r, 1, maxX, blank);
+		}
+	}
 
 	pthread_mutex_unlock(&m_rwLock);
 }
@@ -623,6 +651,12 @@ void TerminalState::setMargin(int nTop, int nBottom)
 		nBottom = nTop + 1;
 	}
 
+	if (nBottom - nTop < 2)
+	{
+		nTop = 1;
+		nBottom = m_displayScreenSize.getY();
+	}
+
 	m_nTopMargin = nTop;
 	m_nBottomMargin = nBottom;
 
@@ -704,7 +738,7 @@ int TerminalState::getGraphicsModeFlags()
 	return m_currentGraphicsState.nGraphicsMode;
 }
 
-void TerminalState::setForegroundColor(TSColor_t color)
+void TerminalState::setForegroundColor(TSColor color)
 {
 	pthread_mutex_lock(&m_rwLock);
 
@@ -713,12 +747,12 @@ void TerminalState::setForegroundColor(TSColor_t color)
 	pthread_mutex_unlock(&m_rwLock);
 }
 
-TSColor_t TerminalState::getForegroundColor()
+TSColor TerminalState::getForegroundColor()
 {
 	return m_currentGraphicsState.foregroundColor;
 }
 
-void TerminalState::setBackgroundColor(TSColor_t color)
+void TerminalState::setBackgroundColor(TSColor color)
 {
 	pthread_mutex_lock(&m_rwLock);
 
@@ -727,7 +761,7 @@ void TerminalState::setBackgroundColor(TSColor_t color)
 	pthread_mutex_unlock(&m_rwLock);
 }
 
-TSColor_t TerminalState::getBackgroundColor()
+TSColor TerminalState::getBackgroundColor()
 {
 	return m_currentGraphicsState.backgroundColor;
 }
@@ -776,6 +810,7 @@ CellCharacter TerminalState::applyCharset(CellCharacter cChar) {
 
 	switch (m_currentGraphicsState.charset) {
 	case '0': // SPEC
+	case '2': // SPEC
 		if (0x5F <= cChar && cChar <= 0x7E) cChar = vt100_mapping[cChar - 0x5F];
 		break;
 	case 'A':

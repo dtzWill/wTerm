@@ -87,10 +87,10 @@ void VTTerminalState::processControlSeq(int nToken, int *values, int numValues, 
 		insertBlanks(values[0] ? values[0] : 1);
 		break;
 	case CS_SU: //ESC[<Value>S Scroll Up Lines
-		m_screenBuffer.scrollLines(m_nTopMargin, m_nBottomMargin, values[0] ? values[0] : 1);
+		m_screenBuffer.scrollLines(m_nTopMargin, m_nBottomMargin, values[0] ? values[0] : 1, TSCell(BLANK, m_currentGraphicsState));
 		break;
 	case CS_SD: //ESC[<Value>T Scroll Down Lines
-		m_screenBuffer.scrollLines(m_nTopMargin, m_nBottomMargin, -(values[0] ? values[0] : 1));
+		m_screenBuffer.scrollLines(m_nTopMargin, m_nBottomMargin, -(values[0] ? values[0] : 1), TSCell(BLANK, m_currentGraphicsState));
 		break;
 	case CS_TAB_SET: //ESCH TAB SET
 		{
@@ -130,10 +130,10 @@ void VTTerminalState::processControlSeq(int nToken, int *values, int numValues, 
 			break;
 		}
 		break;
-	case CS_BACK_INDEX:
+	case CS_BACK_INDEX: // ESC6
 		backIndex();
 		break;
-	case CS_FORWARD_INDEX:
+	case CS_FORWARD_INDEX: // ESC9
 		forwardIndex();
 		break;
 	case CS_TAB_FORWARD: //ESC[<Tabs>I
@@ -246,7 +246,7 @@ void VTTerminalState::processControlSeq(int nToken, int *values, int numValues, 
 				}
 				else if (values[i] >= 30 && values[i] <= 37)
 				{
-					setForegroundColor((TSColor_t)(values[i] - 30));
+					setForegroundColor((TSColor)(values[i] - 30));
 				}
 				else if (values[i] == 39)
 				{
@@ -254,7 +254,7 @@ void VTTerminalState::processControlSeq(int nToken, int *values, int numValues, 
 				}
 				else if (values[i] >= 40 && values[i] <= 47)
 				{
-					setBackgroundColor((TSColor_t)(values[i] - 40));
+					setBackgroundColor((TSColor)(values[i] - 40));
 				}
 				else if (values[i] == 49)
 				{
@@ -626,6 +626,12 @@ void VTTerminalState::processControlSeq(int nToken, int *values, int numValues, 
 	case CS_INSERT_COLUMN: // ESC[<Value>'}
 		insertColumns(values[0]);
 		break;
+	case CS_SCROLL_RIGHT: // ESC[<Value>'A
+		scrollRight(values[0]);
+		break;
+	case CS_SCROLL_LEFT: // ESC[<Value>'@
+		scrollLeft(values[0]);
+		break;
 	default:
 		syslog(LOG_ERR, "VT100 Control Sequence: %d not implemented.", nToken);
 		break;
@@ -659,7 +665,7 @@ void VTTerminalState::insertString(const char *sStr, int len, ExtTerminal *extTe
 	pthread_mutex_unlock(&m_rwLock);
 }
 
-void VTTerminalState::sendCursorCommand(VTTS_Cursor_t cursor, ExtTerminal *extTerminal)
+void VTTerminalState::sendCursorCommand(VTTS_Cursor cursor, ExtTerminal *extTerminal)
 {
 	if (extTerminal != NULL)
 	{

@@ -53,13 +53,13 @@ PDL_bool setActive(PDL_JSParameters *params) {
 }
 
 PDL_bool setKey(PDL_JSParameters *params) {
-	wTerm->setKey((TSInput_t)PDL_GetJSParamInt(params, 0), PDL_GetJSParamString(params, 1));
+	wTerm->setKey((TSInput)PDL_GetJSParamInt(params, 0), PDL_GetJSParamString(params, 1));
 	return PDL_TRUE;
 }
 
 PDL_bool setColor(PDL_JSParameters *params) {
 
-	TSColor_t color = (TSColor_t)PDL_GetJSParamInt(params, 0);
+	TSColor color = (TSColor)PDL_GetJSParamInt(params, 0);
 	int r = PDL_GetJSParamInt(params, 1);
 	int g = PDL_GetJSParamInt(params, 2);
 	int b = PDL_GetJSParamInt(params, 3);
@@ -130,6 +130,8 @@ int main(int argc, const char* argv[])
 	terminal->path = strdup(argv[0]);
 	char *e = strrchr(terminal->path, '/');
 	*e = 0;
+
+	chdir(terminal->path);
 
 	wTerm->setFontSize((argc > 1 && atoi(argv[1])) ? atoi(argv[1]) : 12);
 	wTerm->start();

@@ -39,7 +39,7 @@ ControlSeqParser::~ControlSeqParser()
 {
 }
 
-void ControlSeqParser::addFixedLookup(const char *str, CSToken_t token)
+void ControlSeqParser::addFixedLookup(const char *str, CSToken token)
 {
 	CS_Fixed_Entry e;
 	unsigned int slen = strlen(str);
@@ -67,7 +67,7 @@ void ControlSeqParser::addFixedLookup(const char *str, CSToken_t token)
 	it->second.push_back(e);
 }
 
-void ControlSeqParser::addVT52FixedLookup(const char *str, CSToken_t token) {
+void ControlSeqParser::addVT52FixedLookup(const char *str, CSToken token) {
 	CS_Fixed_Entry e;
 	unsigned int slen = strlen(str);
 	if (slen == 0) return; /* invalid */
@@ -94,7 +94,7 @@ void ControlSeqParser::addVT52FixedLookup(const char *str, CSToken_t token) {
 	it->second.push_back(e);
 }
 
-void ControlSeqParser::addCSILookup(const char parameter, CSToken_t token, int nMinParam, int nMaxParam, int nDefaultVal, char cFinal)
+void ControlSeqParser::addCSILookup(const char parameter, CSToken token, int nMinParam, int nMaxParam, int nDefaultVal, char cFinal)
 {
 	CSI_Entry e;
 	e.token = token;
@@ -124,7 +124,7 @@ void ControlSeqParser::addCSILookup(const char parameter, CSToken_t token, int n
 	it->second.push_back(e);
 }
 
-void ControlSeqParser::addCSI2Lookup(const char parameter, CSToken_t token, int nMinParam, int nMaxParam, int nDefaultVal, char cSuffix, char cFinal)
+void ControlSeqParser::addCSI2Lookup(const char parameter, CSToken token, int nMinParam, int nMaxParam, int nDefaultVal, char cSuffix, char cFinal)
 {
 	CSI_Entry e;
 	e.token = token;
@@ -163,6 +163,9 @@ void ControlSeqParser::buildLookup()
 
 	addCSI2Lookup(0, CS_INSERT_COLUMN, 0, -1, 1, '\'', '}'); // what about SP } ? (http://invisible-island.net/xterm/ctlseqs/ctlseqs.html)
 	addCSI2Lookup(0, CS_DELETE_COLUMN, 0, -1, 1, '\'', '~'); // what about SP } ? (http://invisible-island.net/xterm/ctlseqs/ctlseqs.html)
+
+	addCSI2Lookup(0, CS_SCROLL_RIGHT, 0, -1, 1, ' ', 'A');
+	addCSI2Lookup(0, CS_SCROLL_LEFT, 0, -1, 1, ' ', '@');
 
 	addCSILookup(0, CS_ICH, 1, 1, 1, '@');
 	addCSILookup(0, CS_CURSOR_UP, 1, 1, 1, 'A');
@@ -472,8 +475,7 @@ bool ControlSeqParser::parseChar() {
 		return false;  /* ignore */
 	case 0x18: // ^X CAN
 		m_state = ST_START;
-		m_currentChar = 0x2592;
-		return true;
+		return false;
 	case 0x19: // ^Y EM
 		return false;  /* ignore */
 	case 0x1A: // ^Z SUB
