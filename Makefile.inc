@@ -6,7 +6,7 @@ ifdef NATIVE
 CC=gcc
 CXX=g++
 ROOT=/media/ext3fs/dev
-MARCH_TUNE=-O2 -march=armv7-a -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp
+MARCH_TUNE=-O2 -march=armv7-a -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp -I/opt/include/ncurses
 
 else ifeq ($(DEVICE),1)
 	ARCH=armv7
@@ -48,7 +48,6 @@ else
 		CXX=$(BUILD_ROOT)/toolchain/i686-unknown-linux-gnu/build/i686-unknown-linux-gnu/bin/i686-unknown-linux-gnu-g++
 		ROOT=$(BUILD_ROOT)/staging/i686/usr
 	endif
-endif
 endif
 
 ifeq ($(DEBUG),1)
