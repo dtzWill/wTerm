@@ -19,6 +19,7 @@
 
 #include "sdl/sdlcore.hpp"
 #include "sdl/wterm.hpp"
+#include "sdl/webos.hpp"
 #include "terminal/terminal.hpp"
 #include "terminal/vtterminalstate.hpp"
 #include "util/utf8.hpp"
@@ -27,13 +28,15 @@
 #include <PDL.h>
 
 WTerm *wTerm;
-
+Webos::Adapter *wAdapter;
 
 
 PDL_bool inject(PDL_JSParameters *params) {
 	const char *cmd = PDL_GetJSParamString(params, 0);
+	int noexec = PDL_GetJSParamInt(params, 1);
 	wTerm->injectData(cmd);
-	wTerm->injectData("\n");
+	if (noexec != 1)
+		wTerm->injectData("\n");
 	return PDL_TRUE;
 }
 
@@ -46,7 +49,7 @@ PDL_bool setActive(PDL_JSParameters *params) {
 	int active = PDL_GetJSParamInt(params, 0);
 	wTerm->setActive(active);
 	if (active == 0)
-		wTerm->stopKeyRepeat();
+		wAdapter->stopKeyRepeat();
 	else
 		wTerm->refresh();
 	return PDL_TRUE;
@@ -72,31 +75,8 @@ PDL_bool setColor(PDL_JSParameters *params) {
 }
 
 PDL_bool setFontSize(PDL_JSParameters *params) {
-	wTerm->setFontSize(PDL_GetJSParamInt(params, 0));
-	char *reply = 0;
-	asprintf(&reply, "%d", wTerm->getFontSize());
-	PDL_JSReply(params, reply);
-	free(reply);
+	wAdapter->setFontSize(PDL_GetJSParamInt(params, 0));
 
-	wTerm->updateDisplaySize();
-	wTerm->refresh();
-
-	return PDL_TRUE;
-}
-
-PDL_bool getFontSize(PDL_JSParameters *params) {
-	char *reply = 0;
-	asprintf(&reply, "%d", wTerm->getFontSize());
-	PDL_JSReply(params, reply);
-	free(reply);
-	return PDL_TRUE;
-}
-
-PDL_bool getDimensions(PDL_JSParameters *params) {
-	char *reply = 0;
-	asprintf(&reply, "[%d,%d]", wTerm->getMaximumLinesOfText(), wTerm->getMaximumColumnsOfText());
-	PDL_JSReply(params, reply);
-	free(reply);
 	return PDL_TRUE;
 }
 
@@ -105,27 +85,23 @@ PDL_bool pushKeyEvent(PDL_JSParameters *params) {
 
 	event.type = PDL_GetJSParamInt(params, 0) ? SDL_KEYDOWN : SDL_KEYUP;
 	event.key.type = event.type;
-	event.key.keysym.sym = (SDLKey)PDL_GetJSParamInt(params, 1);
-	event.key.keysym.unicode = parseUtf8Char(PDL_GetJSParamString(params, 2));
+	event.key.keysym.mod = (SDLMod)PDL_GetJSParamInt(params, 1);
+	event.key.keysym.sym = (SDLKey)PDL_GetJSParamInt(params, 2);
+	event.key.keysym.unicode = parseUtf8Char(PDL_GetJSParamString(params, 3));
 
-	wTerm->fakeKeyEvent(event);
+	bool sound = (0 != PDL_GetJSParamInt(params, 4));
 
-	char *reply = 0;
-	asprintf(&reply, "%d", SDL_GetModState());
-	PDL_JSReply(params, reply);
-	free(reply);
+	wAdapter->fakeKeyEvent(event, sound);
 
 	return PDL_TRUE;
 }
 
-int main(int argc, const char* argv[])
+void terminal_main(int argc, const char* argv[])
 {
-	openlog("us.ryanhope.wterm.plugin", LOG_PID, LOG_USER);
-	setlogmask(LOG_UPTO(LOGLEVEL));
-
 	PDL_Init(0);
 
 	wTerm = new WTerm();
+	wAdapter = new Webos::Adapter(wTerm);
 	Terminal *terminal = new Terminal();
 	terminal->path = strdup(argv[0]);
 	char *e = strrchr(terminal->path, '/');
@@ -147,8 +123,6 @@ int main(int argc, const char* argv[])
 	PDL_RegisterJSHandler("setKey", setKey);
 	PDL_RegisterJSHandler("setColor", setColor);
 	PDL_RegisterJSHandler("pushKeyEvent", pushKeyEvent);
-	PDL_RegisterJSHandler("getDimensions", getDimensions);
-	PDL_RegisterJSHandler("getFontSize", getFontSize);
 	PDL_RegisterJSHandler("setFontSize", setFontSize);
 
 	PDL_JSRegistrationComplete();
@@ -188,9 +162,6 @@ int main(int argc, const char* argv[])
 	terminal->setExtTerminal(NULL);
 
 	delete terminal;
+	delete wAdapter;
 	delete wTerm;
-
-	closelog();
-
-	exit(0);
 }

@@ -31,6 +31,8 @@ TerminalState::TerminalState()
 {
 	m_nTermModeFlags = 0;
 
+	m_savedCharset = 'B';
+
 	unsolicited = false;
 
 	m_nTopMargin = 0;
@@ -766,26 +768,6 @@ TSColor TerminalState::getBackgroundColor()
 	return m_currentGraphicsState.backgroundColor;
 }
 
-void TerminalState::setCharset(unsigned int ndx, unsigned char charset)
-{
-	pthread_mutex_lock(&m_rwLock);
-
-	m_currentGraphicsState.charsets[ndx & 0x3] = charset;
-	m_currentGraphicsState.charset = m_currentGraphicsState.charsets[m_currentGraphicsState.charset_ndx];
-
-	pthread_mutex_unlock(&m_rwLock);
-}
-
-void TerminalState::useCharset(unsigned int ndx)
-{
-	pthread_mutex_lock(&m_rwLock);
-
-	m_currentGraphicsState.charset_ndx = ndx & 0x3;
-	m_currentGraphicsState.charset = m_currentGraphicsState.charsets[ndx & 0x3];
-
-	pthread_mutex_unlock(&m_rwLock);
-}
-
 CellCharacter TerminalState::applyCharset(CellCharacter cChar) {
 	/* map offset 0x5F (to 0x7E) */
 	static const CellCharacter vt100_mapping[32] = {
@@ -808,7 +790,7 @@ CellCharacter TerminalState::applyCharset(CellCharacter cChar) {
 
 	pthread_mutex_lock(&m_rwLock);
 
-	switch (m_currentGraphicsState.charset) {
+	switch (m_currentCharset.charset) {
 	case '0': // SPEC
 	case '2': // SPEC
 		if (0x5F <= cChar && cChar <= 0x7E) cChar = vt100_mapping[cChar - 0x5F];
@@ -823,11 +805,6 @@ CellCharacter TerminalState::applyCharset(CellCharacter cChar) {
 	pthread_mutex_unlock(&m_rwLock);
 
 	return cChar;
-}
-
-unsigned char TerminalState::charset()
-{
-	return m_currentGraphicsState.charset;
 }
 
 TSGraphicsState TerminalState::getCurrentGraphicsState()
@@ -918,6 +895,7 @@ void TerminalState::saveCursor()
 
 	m_savedGraphicsState = m_currentGraphicsState;
 	m_savedCursorLoc = m_cursorLoc;
+	m_savedCharset = m_currentCharset.charset;
 
 	pthread_mutex_unlock(&m_rwLock);
 }
@@ -931,6 +909,7 @@ void TerminalState::restoreCursor()
 
 	m_currentGraphicsState = m_savedGraphicsState;
 	m_cursorLoc = m_savedCursorLoc;
+	m_currentCharset.charset = m_savedCharset;
 
 	pthread_mutex_unlock(&m_rwLock);
 }
@@ -1000,9 +979,10 @@ void TerminalState::resetTerminal()
 	setMargin(1,getDisplayScreenSize().getY());
 	eraseScreen();
 	cursorHome();
+	m_currentGraphicsState.reset();
+	m_currentCharset.reset();
 	saveCursor();
 	tabs.clear();
-	m_currentGraphicsState = TSGraphicsState();
 	unsolicited = false;
 
 	pthread_mutex_unlock(&m_rwLock);

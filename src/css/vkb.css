@@ -1,0 +1,40 @@
+/* Colored Keys */
+.vkb .key.arrow {
+	background-color: #FFFBD2;
+}
+.vkb .key.small {
+	background-color: #FFD2F5;
+}
+.vkb .key.escape {
+	background-color: #D2FFD6;
+}
+.vkb .key.sym {
+	background-color: #FFC180;
+}
+.vkb .key.backspace {
+	background-color: #FFFBD2;
+}
+.vkb .key.shift-left {
+	background-color: #D0D0D0;
+}
+.vkb .key.shift-right {
+	background-color: #D0D0D0;
+}
+.vkb .key.caps {
+	background-color: #D0D0D0;
+}
+.vkb .key.mod.fn {
+	background-color: #D2D2FF;
+	color: #0000FF;
+}
+.vkb .key.mod.alt {
+	background-color: #D0D0D0;
+}
+.vkb .key.mod.ctrl {
+	background-color: #D0D0D0;
+}
+.vkb .fnBind {
+	color: #0000FF;
+	font-size: 80%;
+	font-weight: 100;
+}

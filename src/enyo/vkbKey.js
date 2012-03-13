@@ -26,14 +26,12 @@ enyo.kind({
 		disabled: false,
 		sym: -1,
 		symbols: null,
-		terminal: null,
+		isPhone: false,
 	},
 
 	events: {
-		ontouchstart: '',
-		ontouchend: '',
-		onmousedown: '',
-		onmouseup: ''
+		ondown: '',
+		onup: '',
 	},
 
 	create: function() {
@@ -43,10 +41,10 @@ enyo.kind({
 	},
 
 	initComponents: function() {
-	this.inherited(arguments)
-	if (this.symbols) {
+		this.inherited(arguments)
+		if (this.symbols) {
 			if (!this.visual) this.visual = arrayRemoveNull(this.symbols);
-		switch(this.visual.length) {
+			switch(this.visual.length) {
 			case 1:
 				this.createComponents([
 					{flex: 1, content: vbkKeyContent(this.visual[0])}
@@ -90,44 +88,33 @@ enyo.kind({
 	rendered: function() {
 		this.inherited(arguments);
 		if (this.hasNode()) {
-			this.node.ontouchstart = enyo.bind(this,'handleTouchstart')
-			this.node.ontouchend = enyo.bind(this,'handleTouchend')
+			if (this.isPhone) {
+				this.node.addEventListener("mousedown", enyo.bind(this, this.handleDownEvent), false);
+				this.node.addEventListener("mouseout", enyo.bind(this, this.handleUpEvent), false);
+				this.node.addEventListener("mouseup", enyo.bind(this, this.handleUpEvent), false);
+			}
 		}
 	},
 
-	handleTouchstart: function() {
+	handleUpEvent: function(inEvent) {
+		if (!this.disabled && !this.toggling) {
+			this.setDown(false)
+			this.doUp()
+		}
+	},
+
+	handleDownEvent: function(inEvent) {
 		if (!this.disabled) {
 			if (this.toggling)
 				this.setDown(!this.down)
 			else
 				this.setDown(true)
-			this.doTouchstart()
+			this.doDown()
 		}
 	},
 
-	handleTouchend: function() {
-		if (!this.disabled && !this.toggling) {
-			this.setDown(false)
-			this.doTouchend()
-		}
-	},
-
-	mousedownHandler: function() {
-		if (!this.disabled) {
-			if (this.toggling)
-				this.setDown(!this.down)
-			else
-				this.setDown(true)
-			this.doMousedown()
-		}
-    },
-	mouseupHandler: function() {
-		if (!this.disabled && !this.toggling) {
-			this.setDown(false)
-			this.doMouseup()
-		}
-	},
-	
+	mousedownHandler: function() {},
+	mouseupHandler: function() {},
 	mouseoutHandler: function() {},	
 	mouseoverHandler: function() {},
 	flickHandler: function() {},

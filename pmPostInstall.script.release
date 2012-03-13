@@ -27,14 +27,23 @@ OLDSCHOOL=0
 [ $MAJOR = 1 ] && OLDSCHOOL=1
 [ $MAJOR = 2 -a $MINOR -lt 2 ] && OLDSCHOOL=1
 
+rm -rf /etc/profile.d/*${APPID}*
 mkdir -p /etc/profile.d
-echo "PATH=\${PATH}:${APPDIR}/bin" > /etc/profile.d/${APPID}
+cp ${APPDIR}/50_${APPID} /etc/profile.d/
 
 JAILCONF="${APPDIR}/jail.conf"
 
 [ $OLDSCHOOL = 1 ] && JAILCONF="/etc/jail_native-palm.conf"
 
 echo "${JUID}:5000:${APPID}:/dev/null:${JAILCONF}" >> /var/palm/data/jailusers
+
+rm -f /var/palm/ls2/roles/pub/${APPID}.json
+rm -f /var/palm/ls2/roles/prv/${APPID}.json
+
+cp ${APPDIR}/roles/pub.json /var/palm/ls2/roles/pub/${APPID}.json
+cp ${APPDIR}/roles/prv.json /var/palm/ls2/roles/prv/${APPID}.json
+
+ls-control scan-services
 
 luna-send -n 1 palm://com.palm.applicationManager/launch '{"id":"us.ryanhope.wterm","params":{"resetFirstUse": true}}'
 

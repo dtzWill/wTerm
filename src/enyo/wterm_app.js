@@ -2,23 +2,39 @@ enyo.kind({
 
 	name: "wTermApp",
 	kind: enyo.VFlexBox,
-
-	showVKB: false,
-
+	
+	_isPhone: null,
+	_orientation: null,
+	_rotationLock: null,
+	_landscape: null,
+	_vkbClass: null,
+	_showVKB: true,
+	_windowTitle: null,
+	
+	_headerHeight: 29,
+	
 	components: [
 		{
-			kind: "ApplicationEvents",
-			onWindowRotated: "setup",
-			onWindowActivated: 'windowActivated',
-			onWindowDeactivated: 'windowDeactivated'
+			name : "sysSound",
+			kind : "PalmService",
+			service : "palm://com.palm.audio/systemsounds",
+			method : "playFeedback"
 		},
 		{
 			name : "getPreferencesCall",
 			kind : "PalmService",
-			service : "palm://com.palm.systemservice/",
 			subscribe: true,
-			method : "getPreferences",
-			onSuccess : "prefCallSuccess",
+			service : "palm://com.palm.systemservice/"
+		},
+		{
+			name: "prefs",
+			kind: "PrefsPullout",
+			style: "width: 320px; position: absolute; margin-bottom: 0px; right: 0", //width: 384px
+			className: "enyo-bg",
+			flyInFrom: "right",
+			onOpen: "pulloutToggle",
+			onClose: "closeRightPullout",
+			onVKBLayoutChange: 'VKBLayoutChange'
 		},
 		{
 			kind: 'Popup2',
@@ -26,8 +42,8 @@ enyo.kind({
 			scrim: true,
 			components: [
 				{style: 'text-align: center; padding-bottom: 6px; font-size: 120%;', allowHtml: true, content: '<img src="images/icon-64.png"/ style="vertical-align: middle; padding-right: 1em;"><b><u>wTerm v'+enyo.fetchAppInfo().version+'</u></b>'},
-				{style: 'padding: 4px; text-align: center; font-size: 90%', content: '<a href="https://github.com/PuffTheMagic/wTerm">Project Home</a>'},
-				{style: 'padding: 4px; text-align: center; font-size: 90%', content: '<a href="https://github.com/PuffTheMagic/wTerm/issues">Issues</a>'},
+				{style: 'padding: 4px; text-align: center; font-size: 90%', content: '<a href="https://github.com/RyanHope/wTerm">Project Home</a>'},
+				{style: 'padding: 4px; text-align: center; font-size: 90%', content: '<a href="https://github.com/RyanHope/wTerm/issues">Issues</a>'},
 				{style: 'padding: 4px; text-align: center; font-size: 90%', content: '<a href="https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=VU4L7VTGSR5C2">Donate</a>'},
 				{style: 'text-align: center; padding-top: 24px; font-style: italic; font-size: 60%', allowHtml: true, content: '&copy; 2011-2012 WebOS Internals'}
 			]
@@ -78,54 +94,119 @@ enyo.kind({
 	windowDeactivated: function() {
 		this.$.terminal.setActive(0)
 	},
-
+	
+	create: function() {
+		this.inherited(arguments)
+		enyo.setFullScreen(true)
+		this._isPhone = (enyo.fetchDeviceInfo().keyboardAvailable || enyo.fetchDeviceInfo().keyboardSlider)
+		this._showVKB = enyo.application.p.get('showVKB')
+		if (enyo.fetchDeviceInfo().platformVersionMajor == 2 && enyo.fetchDeviceInfo().platformVersionMinor == 1)
+			enyo.setAllowedOrientation("up")
+		this.getRotationLock()
+	},
+	
 	initComponents: function() {
 		this.inherited(arguments)
-		this.showVKB = enyo.application.p.get('showVKB')
 		this.createComponent({
-			name: "prefs",
-			kind: "PrefsPullout",
-			style: "width: 320px; top: 0px; bottom: 0; margin-bottom: 0px;", //width: 384px
-			className: "enyo-bg",
-			flyInFrom: "right",
-			onOpen: "pulloutToggle",
-			onClose: "closeRightPullout",
-			onVKBLayoutChange: 'VKBLayoutChange'
+			kind: "AppMenu", components: [
+				{caption: "New Terminal", onclick: "newTerm"},
+				{caption: "Preferences", onclick: "openPrefs"},
+				{caption: "Setup", onclick: "openSetup"},
+				//{name: 'vkbToggle', caption: this.getVKBMenuText(), onclick: 'toggleVKB'},
+				{caption: "Paste", onclick: "doPaste"},
+				{caption: "About", onclick: "openAbout"}
+			]
 		})
+	},
+	
+	createVKB: function(createTerm) {
+		this.createComponent({
+			kind: enyo.application.p.get('kbdLayout'),
+			name: 'vkb',
+			landscape: this._landscape,
+			phone: this._isPhone
+		})
+		this.$.vkb.render()
+		if (createTerm)
+			this.createTerminal(this.$.vkb.node.clientHeight)
+		this.finalize()
+	},
+	
+	createTerminal: function(vkbHeight) {
+		if (this.$.terminal) {
+			this.$.terminal.setHeight(window.innerHeight - vkbHeight - this._headerHeight);
+			return;
+		}
 		var exec = enyo.application.p.get('exec')
 		if (enyo.windowParams.root && !enyo.windowParams.command)
 			exec = 'login -f root'
 		else if (enyo.windowParams.command)
 			exec = 'login -f wterm'
-		this.createComponent({
+		var term = this.createComponent({
 			name: 'terminal',
 			kind: 'Terminal',
 			executable: 'wterm',
 			width: window.innerWidth,
-			height: window.innerHeight,
+			height: window.innerHeight - vkbHeight - this._headerHeight,
+			onBell: 'bell',
 			onPluginReady: 'pluginReady',
 			onWindowTitleChanged: 'windowTitleChanged',
 			allowKeyboardFocus: true,
 			bgcolor: '000000',
 			params: [enyo.application.p.get('fontSize').toString(10), exec]
 		})
-		this.createComponent({kind: 'vkb', name: 'vkb', terminal: this.$.terminal, showing: true})
+		term.prepend = true
+		term.render()
+		this.createComponent({
+			kind: "ApplicationEvents",
+			onWindowActivated: 'windowActivated',
+			onWindowDeactivated: 'windowDeactivated',
+			onKeydown: 'dispatchKeyInput',
+			onKeyup: 'dispatchKeyInput'
+		})
+		var header = this.createComponent({
+			kind: "HFlexBox",
+			name: 'toolbar',
+			style: 'background-color: black; width: 100%; padding: 0px; margin: 0px; height: '+this._headerHeight+'px',
+			components: [{
+				kind: "HFlexBox",
+				pack: 'center',
+				align: 'center',
+				className: 'termToolbar',
+				components: [
+					{kind: 'CustomButton', layoutKind: 'HFlexLayout', className: 'menutext', onclick: 'showAppMenu', components: [
+						{content: 'Menu'},
+						{className: 'arrowUp'}
+					]},
+					{name: "termTitle", flex: 1, className: "title", content: 'wTerm'},
+					{kind: 'CustomButton', layoutKind: 'HFlexLayout', className: 'menutext', onclick: 'toggleVKB', components: [
+						{name: 'vkbButtonTxt', content: this.getVKBMenuText()},
+						{name: 'vkbButtonImg', className: this.getVKBMenuClass()}
+					]},
+				]
+			}]
+		})
+		header.prepend = true
+		header.render()
+	},
+	
+	showAppMenu: function(inSender, inEvent) {
+		this.$.appMenu.openAtControl(inSender, {top: 28})
+	},
+
+	finalize: function() {
+		this.$.vkb.setTerminal(this.$.terminal)
 		this.$.terminal.vkb = this.$.vkb
 		this.$.prefs.vkb = this.$.vkb
 		this.$.prefs.terminal = this.$.terminal
-		this.createComponent({
-			kind: "AppMenu", components: [
-				{caption: "New Terminal", onclick: "newTerm"},
-				{caption: "Preferences", onclick: "openPrefs"},
-				{caption: "Setup", onclick: "openSetup"},
-				{name: 'vkbToggle', caption: this.getVKBMenuText(), onclick: 'toggleVKB'},
-				{caption: "About", onclick: "openAbout"}
-			]
-		})
 	},
-	
+
 	windowTitleChanged: function(inSender, txt) {
-		enyo.windows.addBannerMessage(txt, enyo.json.stringify({bannerTap: true, windowName: window.name}))
+		this.$.termTitle.setContent(txt)
+	},
+
+	bell: function() {
+		this.$.sysSound.call({"name": "error_02"})
 	},
 
 	pluginReady: function() {
@@ -137,49 +218,72 @@ enyo.kind({
 				this.$.command.setContent(enyo.windowParams.command)
 			}
 		}
-		this.setup()
-		this.$.terminal.focus()
 	},
 
-	setupKeyboard: function(portrait) {
-		var width = window.innerWidth
-		var height = window.innerHeight
-		if (portrait)
-			this.$.vkb.small()
-		else
-			this.$.vkb.large()
-		if (this.showVKB)
-			height = height - this.$.vkb.hasNode().scrollHeight
-		this.$.terminal.resize(width, height)
-	},
-
-	prefCallSuccess: function(inSender, inResponse) {
-		if (inResponse.rotationLock == 3 || inResponse.rotationLock == 4)
-			this.setupKeyboard(false)
-		else if (inResponse.rotationLock == 5 || inResponse.rotationLock == 6)
-			this.setupKeyboard(true)
-		else {
-			var o = enyo.getWindowOrientation()
-			if (o == 'up' || o == 'down')
-				this.setupKeyboard(false)
-			else
-				this.setupKeyboard(true)
+	setupKeyboard: function() {
+		if (typeof this.$.vkb != 'undefined' && this.$.vkb.hasNode()) {
+			var width = window.innerWidth
+			var height = window.innerHeight - this._headerHeight
+			this.$.vkb.setLandscape(this._landscape)
+			if (this._showVKB)
+				height = height - this.$.vkb.hasNode().scrollHeight
+			if (typeof this.$.terminal != 'undefined' && this.$.terminal.hasNode())
+				this.$.terminal.resize(width, height)
+		} else {
+			enyo.asyncMethod(this, enyo.bind(this, this.setupKeyboard))
 		}
 	},
 
+	getRotationLock: function() {
+		this.$.getPreferencesCall.call(
+			{"keys": ["rotationLock"]},
+			{method : "getPreferences",onSuccess : "rotationLockReponse"}
+		)
+	},
+
+	rotationLockReponse: function(inSender, inResponse) {		
+		var tmpOrientation = enyo.getWindowOrientation()
+		if (typeof inResponse.rotationLock != 'undefined')
+			this._rotationLock = inResponse.rotationLock
+		else
+			this._rotationLock = 0
+		if (this._rotationLock == 3)
+			tmpOrientation = 'up'
+		else if (this._rotationLock == 4)
+			tmpOrientation = 'down'
+		else if (this._rotationLock == 5)
+			tmpOrientation = 'left'
+		else if (this._rotationLock == 6)
+			tmpOrientation = 'right'
+		if (this._landscape == null || this._orientation != tmpOrientation) {
+			this._orientation = tmpOrientation
+			this.processOrientation()
+		}
+		if (typeof inResponse.returnValue === 'undefined')
+			this.refresh()
+		else if (inResponse.returnValue)
+			this.createVKB(true)
+	},
+
 	getVKBMenuText: function() {
-		return this.showVKB ? 'Hide Virtual Keyboard' : 'Show Virtual Keyboard'
+		return this._showVKB ? 'Hide VKB' : 'Show VKB'
+	},
+	
+	getVKBMenuClass: function() {
+		return this._showVKB ? 'arrowDown' : 'arrowUp'
 	},
 
 	setVKBMenu: function() {
-		this.$.vkbToggle.setCaption(this.getVKBMenuText())
+		//this.$.vkbToggle.setCaption(this.getVKBMenuText())
+		this.$.vkbButtonTxt.setContent(this.getVKBMenuText())
+		this.$.vkbButtonImg.setClassName(this.getVKBMenuClass())
 	},
 
 	toggleVKB: function() {
-		this.showVKB = !this.showVKB
-		enyo.application.p.set('showVKB', this.showVKB)
+		this._showVKB = !this._showVKB
+		enyo.application.p.set('showVKB', this._showVKB)
 		this.setVKBMenu()
-		this.setup()
+		this.resizeHandler()
 	},
 
 	openAbout: function() {
@@ -197,17 +301,81 @@ enyo.kind({
 			this.$.prefs.open();
 	},
 
-	setup: function() {
-		this.$.getPreferencesCall.call({"keys":["rotationLock"]});
+	VKBLayoutChange: function() {
+		this.$.vkb.destroy()
+		this.createVKB(false)
+		this.resized()
+	},
+
+	doPaste: function () {
+		enyo.dom.getClipboard(enyo.bind(this, this.handleClipboard))
+	},
+
+	handleClipboard: function (clipData) {
+		this.$.terminal.inject(unescape(clipData), 1)
+	},
+
+	refresh: function() {
+		this.setupKeyboard()
+		this.$.prefs.updateHeight()
 	},
 	
-	VKBLayoutChange: function() {
-		this.setup()
-		this.render()
+	processOrientation: function() {
+		if (this._orientation == 'up' || this._orientation == 'down')
+			this._landscape = !this._isPhone
+		else
+			this._landscape = this._isPhone
+	},
+	
+	resizeHandler: function(inSender, inEvent) {
+		var tmpOrientation = enyo.getWindowOrientation()
+		if (this._rotationLock == 0 && (this._orientation != tmpOrientation))
+			this._orientation = tmpOrientation
+		this.processOrientation()
+		this.refresh()
 	},
 
-	keydownHandler: function(inSender, inEvent) {
-		this.$.terminal.focus()
+	dispatchKeyInput: function(inSender, inEvent) {
+		this.$.terminal.focus();
+		this.$.terminal.hasNode().dispatchEvent(inEvent);
 	},
 
+	rendered: function() {
+		this.inherited(arguments);
+		if (this.hasNode() && !this._isPhone) {
+			this.node.addEventListener("touchstart", enyo.bind(this, this.handleTouchstart), false);
+			this.node.addEventListener("touchend", enyo.bind(this, this.handleTouchend), false);
+			this.node.addEventListener("touchcancel", enyo.bind(this, this.handleTouchend), false);
+		}
+	},
+
+	getEnyoObjectFromElement: function(inElement) {
+		var enyoObject = null;
+		while (inElement)
+		{
+			enyoObject = enyo.$[inElement.id];
+			if (enyoObject && enyoObject.kind == 'vkbKey')
+				return enyoObject;
+			inElement = inElement.parentElement;
+		}
+		return null;
+	},
+
+	handleTouchstart: function(inEvent) {
+		for (var i = 0; i < inEvent.changedTouches.length; i++)
+		{
+			var enyoObject = this.getEnyoObjectFromElement(inEvent.changedTouches[i].target);
+			if (enyoObject)
+				enyoObject.handleDownEvent.call(enyoObject, inEvent);
+		}
+	},
+
+	handleTouchend: function(inEvent) {
+		for (var i = 0; i < inEvent.changedTouches.length; i++)
+		{
+			var enyoObject = this.getEnyoObjectFromElement(inEvent.changedTouches[i].target);
+			if (enyoObject)
+				enyoObject.handleUpEvent.call(enyoObject, inEvent);
+		}
+	}
 })

@@ -1,7 +1,7 @@
 {
 	"title": "dtzTerm",
 	"id": "org.wdtz.wterm",
-	"version": "0.4.0",
+	"version": "0.4.1",
 	"vendor": "Ryan Hope",
 	"type": "web",
 	"noDeprecatedStyles": true,

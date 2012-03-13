@@ -23,15 +23,116 @@
 #include <SDL/SDL.h>
 #include <SDL/SDL_ttf.h>
 #include <map>
+#include <PDL.h>
 
 #include "terminal/vtterminalstate.hpp"
 #include "sdlfontgl.hpp"
+
+#include <time.h>
+
+
+namespace SDL {
+
+class SDLCore;
+
+class TimerCollection;
+class IOCollection;
+class AsyncQueue;
+class ListenThread;
+
+class Abstract_Timer {
+public:
+	Abstract_Timer(SDLCore* core = 0);
+	virtual ~Abstract_Timer();
+	void setCore(SDLCore *core);
+	SDLCore* core();
+
+	virtual void run() = 0;
+
+	void start(unsigned int msec); // repeating timer
+	void start(timespec nextEvent); // one shot
+	void stop();
+	bool running();
+
+private:
+	friend class TimerCollection;
+	SDLCore *m_core;
+	bool m_running;
+	unsigned int m_interval_msec;
+	timespec m_nextEvent;
+};
+
+class Abstract_IO {
+public:
+	Abstract_IO(SDLCore* core = 0);
+	virtual ~Abstract_IO();
+	void setCore(SDLCore *core);
+	SDLCore* core();
+
+	virtual void read_ready();
+	virtual void write_ready();
+
+	void setFD(int fd);
+	int fd();
+
+	void waitRead();
+	void stopRead();
+	void waitWrite();
+	void stopWrite();
+
+	bool reading();
+	bool writing();
+
+private:
+	friend class IOCollection;
+	SDLCore *m_core;
+	int m_fd;
+	bool m_read, m_write, m_registered;
+	unsigned int m_colNdx; // index in the collection vector
+};
+
+/* careful: AsyncJob instances get deleted after they were executed
+ *   (in the sdl thread context)
+ * so don't put such instances on your stack, and don't delete (or access)
+ * them after you sent them!
+ */
+class Abstract_AsyncJob {
+public:
+	Abstract_AsyncJob();
+	virtual ~Abstract_AsyncJob();
+
+	virtual void run() = 0;
+	void send(SDLCore *core);
+};
+
+class KeyRepeatTimer;
+class RefreshDelayTimer;
 
 /**
  * Initializer and basic 2D function for webOS SDL.
  */
 class SDLCore
 {
+private:
+	friend class Abstract_Timer; // access m_timers
+	friend class Abstract_IO; // access m_iocolllection
+	friend class Abstract_AsyncJob; // access m_asyncqueue
+
+	TimerCollection *m_timers;
+	IOCollection *m_iocollection;
+	AsyncQueue *m_asyncqueue;
+	ListenThread *m_listenthread;
+	bool m_listenNotified;
+
+	class BlinkTimer : public Abstract_Timer {
+	public:
+		BlinkTimer(SDLCore* core = 0);
+		virtual void run();
+	};
+
+	BlinkTimer *m_blinkTimer;
+	RefreshDelayTimer *m_refreshDelayTimer;
+
 protected:
 	static const int BUFFER_DIRTY_BIT;
 	static const int FONT_SIZE_DIRTY_BIT;
@@ -47,11 +148,6 @@ protected:
 	bool m_reverse;
 
 	bool active;
-	Uint32 lCycleTimeSlot;
-
-	pthread_t m_blinkThread;
-	static void *blinkThread(void *ptr);
-	int startBlinkThread();
 
 	bool isDirty();
 	bool isDirty(int nDirtyBits);
@@ -73,25 +169,16 @@ private:
 	unsigned int m_fontSize;
 
 private:
-	// pulled from SDL_keyboard.c / lgpl Copyright (C) 1997-2006 Sam Lantinga
-	struct {
-		int firsttime;    /* if we check against the delay or repeat value */
-		int delay;        /* the delay before we start repeating */
-		int interval;     /* the delay between key repeat events */
-		Uint32 timestamp; /* the time the first keydown event occurred */
-		SDL_Event evt;    /* the event we are supposed to repeat */
-	} m_keyRepeat;
-
-
 	int init();
 	int initOpenGL();
 	void shutdown();
+
+	void waitForEvent(SDL_Event &event);
+	void handleEvent(SDL_Event &event);
 	void eventLoop();
 
 	void pushColors();
 	void pushFontStyles();
-
-	void checkKeyRepeat();
 
 public:
 	SDLCore();
@@ -117,9 +204,9 @@ public:
 
 	virtual void updateDisplaySize() = 0;
 
-	void stopKeyRepeat();
-	void fakeKeyEvent(SDL_Event &event);
 	void setActive(int active);
 };
+
+} // end namespace SDL
 
 #endif

@@ -23,7 +23,6 @@
 #include "util/utils.hpp"
 
 #include <SDL/SDL_image.h>
-#include <PDL.h>
 #include <string.h>
 #include <time.h>
 #include <syslog.h>
@@ -173,6 +172,9 @@ void WTerm::handleKeyboardEvent(SDL_Event &event)
 	case SDL_KEYDOWN:
 		switch(sym)
 		{
+		case SDLK_WORLD_30:
+			if (mod & KMOD_MODE) extTerminal->insertData(".");
+			break;
 		case HP_BT_UP:
 		case HP_BT_PLUGIN_UP:
 		case SDLK_UP:
@@ -394,8 +396,6 @@ void WTerm::refresh()
 {
 	SDL_Event event;
 
-	setDirty(BUFFER_DIRTY_BIT);
-
 	memset(&event, 0, sizeof(event));
 	event.type = SDL_VIDEOEXPOSE;
 
@@ -407,8 +407,11 @@ void WTerm::refresh()
  */
 void WTerm::insertData(const char *data, int len)
 {
-	m_terminalState->insertString(data, len, getExtTerminal());
-	refresh();
+	if (data) {
+		m_terminalState->insertString(data, len, getExtTerminal());
+	} else {
+		refresh();
+	}
 }
 
 TerminalState *WTerm::getTerminalState()

@@ -2,6 +2,9 @@ enyo.kind({
 
 	name: 'Terminal',
 	kind: enyo.Hybrid,
+	
+	//style: 'float: top;',
+	//style: 'position: absolute; left: 0; top 0;',
 
 	currentColors: [],
 	currentKeys: [],
@@ -10,15 +13,41 @@ enyo.kind({
 		onPluginReady:'',
 		onPluginConnected:'',
 		onPluginDisconnected:'',
-		onWindowTitleChanged:''
+		onWindowTitleChanged:'',
+		onBell:'',
 	},
 
 	hybridReady: function() {
+		this.addCallback("bell", enyo.bind(this, "bell"))
 		this.addCallback("OSCevent", enyo.bind(this, "OSCevent"))
 		this.setColors()
 		this.setKeys()
 		this.setScrollBufferLines(enyo.application.p.get('bufferlines'))
 		this.pluginStatusChangedCallback('ready')
+	},
+
+	// Fixes PopupLayer on phones giving document.body an id/class which messes up enyo.dispatch wrt ApplicationEvents
+	create: function() {
+		this.inherited(arguments);
+		this.dispatchFilter = this.dispatchFilter.bind(this);
+		enyo.dispatcher.features.push(this.dispatchFilter);
+	},
+
+	destroy: function() {
+		var l = enyo.dispatcher.features;
+		for (var i = 0; i < l.length; ++i) {
+			if (l[i] == this.dispatchFilter) {
+				l.splice(i, 1);
+				break;
+			}
+		}
+	},
+
+	dispatchFilter: function(e) {
+		if (enyo.getPopupLayer() == e.dispatchTarget && ('keydown' == e.type || 'keyup' == e.type)) {
+			this.node.dispatchEvent(e);
+			return true;
+		}
 	},
 
 	rendered: function() {
@@ -37,17 +66,21 @@ enyo.kind({
 	focus: function() {
 		if (this.hasNode()) {
 			this.hasNode().focus();
+			return true
 		}
+		return false
 	},
 
 	keydownHandler: function(inSender, inEvent) {
-		if (enyo.fetchDeviceInfo().platformVersionMajor == 2 && enyo.fetchDeviceInfo().platformVersionMinor == 2)
-			this.keyDown(inEvent.keyCode, String.fromCharCode(parseInt(inEvent.keyIdentifier.substr(2), 16)))
+		if (this.vkb && enyo.fetchDeviceInfo().platformVersionMajor == 2 && enyo.fetchDeviceInfo().platformVersionMinor == 2) {
+			this.vkb.keyDown(inEvent.keyCode, String.fromCharCode(parseInt(inEvent.keyIdentifier.substr(2), 16)), 0);
+		}
 	},
 
 	keyupHandler: function(inSender, inEvent) {
-		if (enyo.fetchDeviceInfo().platformVersionMajor == 2 && enyo.fetchDeviceInfo().platformVersionMinor == 2)
-			this.keyUp(inEvent.keyCode, String.fromCharCode(parseInt(inEvent.keyIdentifier.substr(2), 16)))
+		if (this.vkb && enyo.fetchDeviceInfo().platformVersionMajor == 2 && enyo.fetchDeviceInfo().platformVersionMinor == 2) {
+			this.vkb.keyUp(inEvent.keyCode, String.fromCharCode(parseInt(inEvent.keyIdentifier.substr(2), 16)));
+		}
 	},
 
 	/**
@@ -63,6 +96,10 @@ enyo.kind({
 		}
 	},
 
+	bell: function() {
+		this.doBell()
+	},
+
 	/**
 	 * Plugin Methods
 	 */
@@ -70,24 +107,16 @@ enyo.kind({
 		this.callPluginMethodDeferred(null, 'setScrollBufferLines', lines)
 	},
 
-	getDimensions: function() {
-		return enyo.json.parse(this.callPluginMethodDeferred(null, 'getDimensions'))
-	},
-
-	getFontSize: function() {
-		return parseInt(this.callPluginMethodDeferred(null, 'getFontSize'),10)
-	},
-
 	setFontSize: function(fontSize) {
-		return parseInt(this.callPluginMethodDeferred(null, 'setFontSize', fontSize),10)
+		this.callPluginMethodDeferred(null, 'setFontSize', fontSize);
 	},
 
 	setActive: function(active) {
 		if (this.pluginReady) this.callPluginMethodDeferred(null, 'setActive', active);
 	},
 
-	inject: function(command) {
-		this.callPluginMethodDeferred(null, 'inject', command)
+	inject: function(command, noexec) {
+		this.callPluginMethodDeferred(null, 'inject', command, noexec)
 	},
 
 	hasPassword: function(user) {
@@ -106,19 +135,19 @@ enyo.kind({
 		this.callPluginMethod('setupSU', enable)
 	},
 
-	pushKeyEvent: function(type,sym,unicode) {
-		return parseInt(this.callPluginMethod('pushKeyEvent',type,sym,unicode))
+	pushKeyEvent: function(type,modstate,sym,unicode,snd) {
+		this.callPluginMethod('pushKeyEvent',type,modstate,sym,unicode,snd);
 	},
 
 	/**
 	 * Wrapper/Helper Methods
 	 */
-	keyDown: function(sym,unicode) {
-		return this.pushKeyEvent(1,sym,unicode)
+	keyDown: function(modstate,sym,unicode,snd) {
+		this.pushKeyEvent(1,modstate,sym,unicode,snd)
 	},
 
-	keyUp: function(sym,unicode) {
-		return this.pushKeyEvent(0,sym,unicode)
+	keyUp: function(modstate,sym,unicode,snd) {
+		this.pushKeyEvent(0,modstate,sym,unicode,snd)
 	},
 
 	resize: function(width, height) {
@@ -222,5 +251,9 @@ enyo.kind({
 		for (var i=0; i<this.currentKeys.length; i++)
 			this.callPluginMethodDeferred(null, 'setKey', i, this.decodeEscape(this.currentKeys[i]))
 	},
+
+	_prepend: function(inSender, inEvent) {
+		this.log(inSender, inEvent)
+	}
 
 })

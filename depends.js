@@ -1,11 +1,8 @@
 enyo.depends(
 
-	"$enyo/palm/list2/",
-
-	"src/css/main.css",
-
+	"src/css/",
+	
 	"src/models/sdlk.js",
-	"src/models/vkblayout.js",
 
 	"src/enyo/wi/depends.js",
 
@@ -15,6 +12,7 @@ enyo.depends(
 	"src/enyo/setup.js",
 	"src/enyo/popup2.js",
 	"src/enyo/prefs.js",
+	"src/enyo/charSelector.js",
 	"src/enyo/vkbKey.js",
 	"src/enyo/vkb.js",
 	"src/enyo/wterm_prefs.js",

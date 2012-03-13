@@ -15,7 +15,9 @@
  * along with wTerm.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include <SDL/SDL.h>
 #include <syslog.h>
@@ -151,12 +153,9 @@ PDL_bool setupSU(PDL_JSParameters *params)
 	return PDL_TRUE;
 }
 
-int main(int argc, const char* argv[])
+void setup_main(int argc, const char* argv[])
 {
 	SDL_Event Event;
-
-	openlog("us.ryanhope.wterm.plugin", LOG_PID, LOG_USER);
-	setlogmask(LOG_UPTO(LOGLEVEL));
 
 	SDL_Init(SDL_INIT_VIDEO);
 	PDL_Init(0);
@@ -175,7 +174,6 @@ int main(int argc, const char* argv[])
 		SDL_WaitEvent(&Event);
 	} while (Event.type != SDL_QUIT);
 
-	closelog();
-
-	exit(0);
+	PDL_Quit();
+	SDL_Quit();
 }

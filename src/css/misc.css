@@ -1,0 +1,62 @@
+.preferences-header {
+    height: 58px;
+    max-height: 58px;
+}
+
+.preferences-header .enyo-header-inner {
+    padding: 3px 12px;
+}
+
+.preferences-header-image {
+    padding-right: 10px;
+}
+
+.phone .enyo-preferences-box {
+	width: 310px;
+	margin: 0px auto 0;
+}
+
+.phone .enyo-preference-button {
+	width: 180px;
+	margin: 0px auto 0;
+}
+
+.termToolbar {
+	width: 100%;
+	font-size: 70%;
+	color: white;
+	background-color: #2c2e30;
+	min-height: 28px;
+	height: 28px;
+	line-height: 28px;
+	border-bottom: groove;
+	border-width: 1px;
+}
+.termToolbar .menutext {
+	font-weight: 900;
+	padding-left: 4px;
+	padding-right: 4px;
+}
+.termToolbar .arrowDown {
+	background-image:url('menu_arrow_down.png');
+	width: 28px;
+	height: 28px;
+	padding-right: 4px;
+}
+.termToolbar .arrowUp {
+	background-image:url('menu_arrow_up.png');
+	width: 28px;
+	height: 28px;
+	padding-right: 4px;
+}
+.termToolbar .title {
+	border-left: groove;
+	border-right: groove;
+	border-width: 1px;
+	vertical-align: middle;
+	text-align: center;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	padding-left: 18px;
+	padding-right: 18px;
+}
